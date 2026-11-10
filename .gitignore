@@ -1,0 +1,5 @@
+references/
+.research/
+/codec
+/tools/resource.lock
+__pycache__/
