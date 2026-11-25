@@ -1,0 +1,86 @@
+name: One bounded EVEX guest
+on:
+  workflow_call:
+    inputs:
+      slot:
+        required: true
+        type: number
+    outputs:
+      outcome:
+        description: unsupported only if the CPU/OS explicitly refused the instruction
+        value: ${{ jobs.measure.outputs.outcome }}
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    name: VM ${{ inputs.slot }} of 6
+    if: ${{ github.repository == 'thearchitector/seedgrow' && github.ref == 'refs/heads/ci/runner-isa-smoke' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-24.04
+    environment: seedgrow-g8-bounded-v1
+    outputs:
+      outcome: ${{ steps.finish.outputs.outcome }}
+    env:
+      SLOT_NUMBER: ${{ inputs.slot }}
+    steps:
+      - id: checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Execute the CPUID/XCR0-gated synthetic instruction test
+        id: isa
+        shell: bash
+        run: |
+          set -eu; umask 077; ulimit -c 0; d="$RUNNER_TEMP/sg-slot"
+          /usr/bin/python3 -IB tools/resource_guard.py --wall-seconds 0 --log "$d/isa/guard.json" -- \
+            /usr/bin/python3 -IB tools/ci/runner_isa.py run "$d/isa"
+          /usr/bin/python3 -IB tools/ci/runner_isa.py verify "$d/isa" --commit "$GITHUB_SHA"
+          /usr/bin/python3 -IB tools/ci/guest_slot.py select "$d" "$SLOT_NUMBER"
+      - name: Provision scratch on this disposable VM only
+        id: space
+        if: ${{ steps.isa.outputs.eligible == 'true' && runner.environment == 'github-hosted' }}
+        shell: bash
+        run: bash tools/ci/hosted_scratch.sh
+      - name: Actual archive-only decode, production units and matched C/fresh-D pairs on THIS VM
+        id: codec
+        if: ${{ steps.isa.outputs.eligible == 'true' && steps.space.outcome == 'success' }}
+        shell: bash
+        env:
+          SG_GUEST_KEY: ${{ secrets.SEEDGROW_G8_KEY }}
+        run: |
+          set -eu; umask 077; ulimit -c 0; export TMPDIR="$SG_GUEST_SCRATCH"; d="$RUNNER_TEMP/sg-slot"
+          /usr/bin/python3 -IB tools/resource_guard.py --wall-seconds 0 --log "$d/codec/guard.json" -- \
+            /usr/bin/python3 -IB tools/ci/guest_worker.py "$d/codec"
+      - name: Record outcome without treating errors as CPU refusals
+        id: finish
+        if: ${{ always() && !cancelled() && steps.checkout.outcome == 'success' }}
+        env:
+          ISA_STEP: ${{ steps.isa.outcome }}
+          SPACE_STEP: ${{ steps.space.outcome }}
+          CODEC_STEP: ${{ steps.codec.outcome }}
+        shell: bash
+        run: /usr/bin/python3 -IB tools/ci/guest_slot.py finish "$RUNNER_TEMP/sg-slot" "$SLOT_NUMBER"
+      - name: Export allowlisted evidence only (never export scratch or keys)
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: guest-g8-${{ github.run_id }}-${{ github.run_attempt }}-slot-${{ inputs.slot }}
+          path: |
+            ${{ runner.temp }}/sg-slot/dispatch.json
+            ${{ runner.temp }}/sg-slot/isa/guard.json
+            ${{ runner.temp }}/sg-slot/isa/result.json
+            ${{ runner.temp }}/sg-slot/isa/scalar.u32
+            ${{ runner.temp }}/sg-slot/isa/evex.u32
+            ${{ runner.temp }}/sg-slot/codec/guard.json
+            ${{ runner.temp }}/sg-slot/codec/archive.json
+            ${{ runner.temp }}/sg-slot/codec/native.json
+            ${{ runner.temp }}/sg-slot/codec/state.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Explicitly mark exhausted capacity, not a passing codec test
+        if: ${{ inputs.slot == 6 && steps.finish.outputs.outcome == 'unsupported' }}
+        shell: bash
+        run: |
+          echo '::error::No eligible CPU in six serial guests. Inconclusive; no codec result and no automatic rerun.'
+          exit 1

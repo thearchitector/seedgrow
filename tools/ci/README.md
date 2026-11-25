@@ -1,23 +1,32 @@
-# Hosted runner ISA smoke test
+# First eligible hosted guest: a single-push codec experiment
 
-Can this particular GitHub Linux VM **execute** an EVEX-encoded 256-bit `vpdpbusd` and return the expected 512 integer lane results? The two dot widths (64/192) and signed weight range (−7…7) match the codec experiment. Inputs are generated, including overflow cases that distinguish non-saturating from saturating addition. There are no weights, corpus samples, production binaries, credentials or inbound transfer services in the test.
+Standard `ubuntu-24.04` selects an image/architecture, **not** an AVX-512 CPU, dedicated core or stable clock. A previous Intel runner advertised AVX-512; [our first actual smoke test](https://github.com/thearchitector/seedgrow/actions/runs/45534630158) instead received an AMD VM, matched all 512 scalar lanes and correctly refused EVEX. A custom label on a **separately provisioned and verified self-hosted runner** can select a capability; it cannot make that capability available on GitHub's standard pool. Don't attach a persistent privileged self-hosted runner to untrusted public workflows.
 
-A successful job can report either `executed-match` or `unsupported` (CPUID/XCR0 gate, exit 77). The second outcome is not an EVEX pass. A bad output, missing opcode, SIGILL, or resource refusal fails the job. Neither outcome measures the codec, bare-metal isolation, memory eligibility, speedup or contest time. Hosted runner CPUs can change between runs; do not re-run until a preferred CPU appears.
+## Scheduling contract
 
-Pushing the topic branch `ci/runner-isa-smoke` with changes to the referenced test or workflow triggers **one** job. There is no PR, schedule or matrix trigger. Manual dispatch is an alternative once the dispatch-enabled workflow is on the default branch. Do not both push and dispatch the same test.
+Push this topic once (`ci/runner-isa-smoke`); don't both push and dispatch. The caller workflow allocates at most **six fresh VMs, strictly in series**. Each builds and verifies the same synthetic scalar/EVEX test (including actual opcode, CPUID/XCR0, exit code, signed/non-saturating edge cases and raw lane values). An explicit **77 / unsupported**, locally verified on a successful job with its artifact uploaded, is the *only* reason for another VM. On the first supported machine, do all of the following **within that job**; `needs:` does not transfer hardware to a different job. No rerun after a slow result, codec mismatch, denial, pressure, crash or upload failure. Six refusals terminate with an explicit inconclusive error and six receipts. Zero extra virtual machines are scheduled just to report results. No runner-registration, paid larger runner, polling service, Actions-write token, PR, cron, cross-job cache or recursive dispatch is used.
 
-To retrieve a run, select the ID matching the pushed commit, not simply the newest run. For the first attempt (`1`), from the matching topic checkout:
+## Frozen workload
+
+1. **Installed portable release, separate from the G8 timings.** In a fresh directory, decode the pinned 3,309,370 B executable archive (1,002 B wire), check all 4,096 bytes by SHA-256, and reject a damaged payload in another empty directory. No input corpus, prior encoder state or model in the decoder's cwd.
+2. **Actual stock and EVEX binaries**, not just the generated intrinsic loop. Execute both sealed production-kernel scalar-reference units. Run stock and challenger on each of two paid 32 KiB article resets, in forward order `slot1 stock, evex; slot2 stock, evex`. For each arm: C with the pinned literal model in a clean workspace; D in a different fresh workspace with that model and **its own newly encoded wire only**. Require the complete reference wire (7,209 / 7,988 B), exact decoded clear, identical golden physical commit lengths and four pager/clock observations. Confirm EVEX admission for the real challenger, socket isolation and the sparse-pager address-space witness. The first 16 KiB is included in the file cost; warm-tail clocks use the two last marks, not process startup.
+3. **Timing is engineering evidence for this guest only.** For each direction separately, stock tail seconds summed across the two cases divided by EVEX tail seconds must reach **1.10×**, with no EVEX tail more than **5% longer** than its matched stock tail. Only that exact integer gate opens the reverse order, in the **same VM**. All elapsed and CPU observations are retained regardless of which arm wins. A failure of timing is not a reason for a new guest. No bare-metal admission, measured Geekbench score, full corpus, archive-size saving or contest-time claim.
+
+`tools/resource_guard.py --wall-seconds 0` serializes and monitors each numerical tree; CPU policy is untouched. Before native work require ≥8,000,000,000 B available RAM, a sparse-capable scratch volume with >32 GiB free, compatible Ubuntu/Linux x86-64-v3 userspace and sufficient hard AS/FSIZE. The 14,680,064,000 B inaccessible pager mapping is not a RAM allowance. The hosted-only scratch step prefers existing free space/an attached temporary disk; **only on a disposable GitHub-hosted VM**, if needed, it reclaims same-volume preinstalled Android/.NET/GHC SDK directories. Never run that step on a local or self-hosted machine. Insufficient resources stay a terminal non-result; there is no smaller unscheduled substitute test.
+
+## Asset and trust boundary
+
+The public checkout carries one allowlisted **AES-256-GCM ciphertext**, a pinned manifest, and test code. It does not publish plaintext codec binaries, weights, clear samples, compressed corpus slices or the full hardware kit. Private fixture sources: the project’s `frontier3/hardware-kit.zip` (`b5da8dd3…`), and the independently restored installed short archive (`929b6149…`). These contain project modifications to `cmix-neif-2.0` (Marcus Wölk, upstream `35d1957a5074db802fc134126afc77b76d931761`), with GPL-3.0-only and component-specific notices; original sources, modifications, notices and research provenance are retained in the private checkout. The stock transformer/BITLSTM model and two transformed Wikipedia windows are *not* fixtures for public redistribution. Encryption is transport confidentiality, not a license grant.
+
+The randomly generated fixture-only key is an Actions **environment secret** (`seedgrow-g8-bounded-v1` / `SEEDGROW_G8_KEY`), deployable from the exact `ci/runner-isa-smoke` branch only. Review the branch before pushing: anyone allowed to modify workflows on that authorized branch is trusted. No forks, PR events, user commands/URLs, PATs or `croc`. Only the admitted step receives the secret; verified members are written to private temporary storage, never included in artifacts. The codec subprocesses receive a minimal environment and networking is disabled. Optional disarm after verified return: a maintainer can delete **that one environment secret**, without changing repository permissions.
+
+## Return
+
+From the clean topic checkout, after the one push:
 
 ```sh
-repo=thearchitector/seedgrow
-sha=$(git rev-parse HEAD)
-gh run list -R "$repo" --branch ci/runner-isa-smoke --workflow scratchpad.yml --commit "$sha" \
-    --json databaseId,headSha,status,conclusion,url
-# Set id to the returned databaseId for that SHA.
-gh run watch "$id" -R "$repo" --exit-status
-dest=$(mktemp -d)
-gh run download "$id" -R "$repo" -n "runner-isa-$id-1" -D "$dest"
-python3 -IB tools/ci/runner_isa.py verify "$dest" --commit "$sha"
+# Choose a NEW output directory, outside the checkout. Requires authenticated `gh` with Actions read access.
+python3 -IB tools/ci/collect_guest.py /path/to/new/guest-return --wait
 ```
 
-The verifier reads only JSON and raw little-endian lanes; it does not run anything from the artifact. GitHub retains the small return for seven days. The next step after an `executed-match`, if warranted, is a *different* correctness test on a cleared short release fixture, not a full-corpus run.
+The collector never dispatches or reruns a job. It matches repository, workflow, branch, commit and first run attempt; checks each artifact's GitHub digest and size; restores only bounded allowlisted data; then calls `guest_verify.py` to check the slot sequence, lane results, file identities, pager marks, timing arithmetic and conditional reverse. `slot-*.zip`, `provenance.json`, `slots/` and `verification.txt` are retained locally. Artifacts expire after seven days. A verified `exhausted-unsupported` verdict means **no native result**, not successful EVEX execution.

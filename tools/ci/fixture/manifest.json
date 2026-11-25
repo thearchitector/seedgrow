@@ -1,0 +1,48 @@
+{
+  "cipher_bytes": 7962457,
+  "cipher_sha256": "7f510530807b182da1f4d2e65d0a04edeb9d4bc0a46ec435dfe1d009328240ce",
+  "files": {
+    "archive4.sfx": {
+      "bytes": 3309370,
+      "sha256": "929b6149ab8a45116fe39d785e6145f0a9df76d9c1f70606343c8eb4181c7ad9"
+    },
+    "evex.probe": {
+      "bytes": 842696,
+      "sha256": "02a535827e4dd4deb5c6e49934fe606e5a05185982b27e39d449219613bb0c0a"
+    },
+    "evex.unit": {
+      "bytes": 42464,
+      "sha256": "8ac9aa8bd950abcd0ebcfb404287f8507187a1f109f543557b9613016507bbc2"
+    },
+    "model.c5": {
+      "bytes": 3744629,
+      "sha256": "729694cba4969b7d833686ed3f597ff04d3b226da849d5f8004ec020a0ed9563"
+    },
+    "s1.clear": {
+      "bytes": 32768,
+      "sha256": "397027a83119582503310a9d833dd43d9d9e1df9b1d6bbd35c39203423086751"
+    },
+    "s1.wire": {
+      "bytes": 7209,
+      "sha256": "1a19a961e0cd00f02adf14fd8c6b4579a4af64308d7530991cc5eda735e33053"
+    },
+    "s2.clear": {
+      "bytes": 32768,
+      "sha256": "64adfb019a5dc52708bb02a4d77c3e23ef1e756a317f26470a488418b21d2a19"
+    },
+    "s2.wire": {
+      "bytes": 7988,
+      "sha256": "2b22db112ab511087cc209a79ee0eb5c043b1ea28a17fa218d9bf7ca0ed350b8"
+    },
+    "stock.probe": {
+      "bytes": 842696,
+      "sha256": "72ceb819e3f9691664627dba0596b5961d5a8ab75b11f3415654f67366569305"
+    },
+    "stock.unit": {
+      "bytes": 37104,
+      "sha256": "94d61af08475e74f137a97977aeb42f1f95f95d6a40124fca5fc1d3fd7112a39"
+    }
+  },
+  "kit_sha256": "b5da8dd3a486a088b62b86b5f6700529551a6b48d3a68c549fd6d16e753ecd88",
+  "version": 1
+}
