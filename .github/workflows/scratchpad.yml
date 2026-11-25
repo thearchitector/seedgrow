@@ -25,28 +25,41 @@ jobs:
     if: ${{ github.repository == 'thearchitector/seedgrow' && github.ref == 'refs/heads/ci/runner-isa-smoke' }}
     uses: ./.github/workflows/isa-guest-job.yml
     with: {slot: 1}
+    # Name the environment-only secret at every call; do not inherit repository secrets.
+    secrets:
+      SEEDGROW_G8_KEY: ${{ secrets.SEEDGROW_G8_KEY }}
   slot2:
     needs: slot1
     if: ${{ !cancelled() && needs.slot1.result == 'success' && needs.slot1.outputs.outcome == 'unsupported' }}
     uses: ./.github/workflows/isa-guest-job.yml
     with: {slot: 2}
+    secrets:
+      SEEDGROW_G8_KEY: ${{ secrets.SEEDGROW_G8_KEY }}
   slot3:
     needs: slot2
     if: ${{ !cancelled() && needs.slot2.result == 'success' && needs.slot2.outputs.outcome == 'unsupported' }}
     uses: ./.github/workflows/isa-guest-job.yml
     with: {slot: 3}
+    secrets:
+      SEEDGROW_G8_KEY: ${{ secrets.SEEDGROW_G8_KEY }}
   slot4:
     needs: slot3
     if: ${{ !cancelled() && needs.slot3.result == 'success' && needs.slot3.outputs.outcome == 'unsupported' }}
     uses: ./.github/workflows/isa-guest-job.yml
     with: {slot: 4}
+    secrets:
+      SEEDGROW_G8_KEY: ${{ secrets.SEEDGROW_G8_KEY }}
   slot5:
     needs: slot4
     if: ${{ !cancelled() && needs.slot4.result == 'success' && needs.slot4.outputs.outcome == 'unsupported' }}
     uses: ./.github/workflows/isa-guest-job.yml
     with: {slot: 5}
+    secrets:
+      SEEDGROW_G8_KEY: ${{ secrets.SEEDGROW_G8_KEY }}
   slot6:
     needs: slot5
     if: ${{ !cancelled() && needs.slot5.result == 'success' && needs.slot5.outputs.outcome == 'unsupported' }}
     uses: ./.github/workflows/isa-guest-job.yml
     with: {slot: 6}
+    secrets:
+      SEEDGROW_G8_KEY: ${{ secrets.SEEDGROW_G8_KEY }}

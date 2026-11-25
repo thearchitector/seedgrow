@@ -42,6 +42,21 @@ def dump(p, obj):
 
 
 class CapacityError(RuntimeError): pass
+class FixtureKeyError(RuntimeError): pass
+
+
+def take_fixture_key():
+    # Only fixed diagnostic strings may leave this function. Never log the value.
+    encoded = os.environ.pop('SG_GUEST_KEY', '').strip()
+    if not encoded:
+        raise FixtureKeyError('missing fixture key: check the reusable workflow secret mapping')
+    try:
+        key = base64.b64decode(encoded, validate=True)
+    except ValueError:
+        key = b''
+    if len(key) != 32:
+        raise FixtureKeyError('invalid fixture key encoding')
+    return key
 
 
 def available():
@@ -145,7 +160,7 @@ def run(out, mode):
     os.umask(0o077); need(any(d.resolve().name=='resource.lock' for d in Path('/proc/self/fd').iterdir()), 'not guarded')
     need(mode=='guest' or not os.getenv('GITHUB_ACTIONS'), 'no rehearsal on Actions'); need(platform.machine()=='x86_64','wrong architecture')
     need(not (out/'state.json').exists(), 'stale codec state'); out.mkdir(exist_ok=True,parents=True)
-    encoded = os.environ.pop('SG_GUEST_KEY',''); key = base64.b64decode(encoded.strip(),validate=True); del encoded
+    key = take_fixture_key()
     scratch=Path(os.environ['TMPDIR']).resolve(); capacity(scratch)
     need('x86-64-v3 (supported, searched)' in subprocess.check_output(['/lib64/ld-linux-x86-64.so.2','--help'],text=True,env={'LC_ALL':'C'}),'v3 not available')
     with tempfile.TemporaryDirectory(dir=scratch,prefix='sg8-') as t:
@@ -167,7 +182,7 @@ if __name__=='__main__':
     try: run(out,args.mode)
     except Exception as e:
         # Public artifact/console never contain private payload bytes, native output, keys or environment dumps.
-        refused=isinstance(e,CapacityError); status='resource-refused' if refused else 'failed'; reason=str(e) if refused else f'{type(e).__name__} at {Path(__file__).name if e.__traceback__ is None else "bounded workload"}'
+        refused=isinstance(e,CapacityError); status='resource-refused' if refused else 'failed'; reason=str(e) if isinstance(e,(CapacityError,FixtureKeyError)) else f'{type(e).__name__} at {Path(__file__).name if e.__traceback__ is None else "bounded workload"}'
         import traceback
         site=traceback.extract_tb(e.__traceback__)[-1]; print(f'{status}: {reason} [{Path(site.filename).name}:{site.lineno}]',file=sys.stderr)
         out.mkdir(exist_ok=True,parents=True);dump(out/'state.json',{'status':status,'site':f'{Path(site.filename).name}:{site.lineno}','reason':reason});sys.exit(75 if refused else 1)

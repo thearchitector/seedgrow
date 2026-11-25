@@ -1,6 +1,10 @@
 name: One bounded EVEX guest
 on:
   workflow_call:
+    secrets:
+      SEEDGROW_G8_KEY:
+        description: Fixture key supplied by this job's branch-restricted environment
+        required: true
     inputs:
       slot:
         required: true
